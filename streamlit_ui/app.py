@@ -40,22 +40,23 @@ st.markdown("""
         margin-bottom: 2rem;
     }
     .feature-card {
-        background: #1E1E1E;
+        background: #1E1E1E !important;
         padding: 2rem;
         border-radius: 10px;
         margin: 1rem 0;
         border-left: 4px solid #4CAF50;
-        color: #E0E0E0;
+        color: #E0E0E0 !important;
     }
     .feature-card h4 {
-        color: #4CAF50;
+        color: #4CAF50 !important;
         margin-bottom: 1rem;
     }
     .feature-card ul {
-        color: #E0E0E0;
+        color: #E0E0E0 !important;
     }
     .feature-card li {
         margin-bottom: 0.5rem;
+        color: #E0E0E0 !important;
     }
     .cta-button {
         background: #4CAF50;
@@ -67,7 +68,7 @@ st.markdown("""
         margin: 1rem 0;
     }
     .stats-box {
-        background: #1E1E1E;
+        background: #1E1E1E !important;
         padding: 1.5rem;
         border-radius: 8px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.3);
@@ -75,11 +76,11 @@ st.markdown("""
         border: 1px solid #333;
     }
     .stats-box h3 {
-        color: #4CAF50;
+        color: #4CAF50 !important;
         margin-bottom: 0.5rem;
     }
     .stats-box p {
-        color: #B0B0B0;
+        color: #B0B0B0 !important;
         margin: 0;
     }
     </style>
