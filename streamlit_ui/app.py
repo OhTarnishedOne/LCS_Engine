@@ -35,16 +35,27 @@ st.markdown("""
     }
     .sub-header {
         font-size: 1.2rem;
-        color: #666;
+        color: #888;
         text-align: center;
         margin-bottom: 2rem;
     }
     .feature-card {
-        background: #f8f9fa;
+        background: #1E1E1E;
         padding: 2rem;
         border-radius: 10px;
         margin: 1rem 0;
         border-left: 4px solid #4CAF50;
+        color: #E0E0E0;
+    }
+    .feature-card h4 {
+        color: #4CAF50;
+        margin-bottom: 1rem;
+    }
+    .feature-card ul {
+        color: #E0E0E0;
+    }
+    .feature-card li {
+        margin-bottom: 0.5rem;
     }
     .cta-button {
         background: #4CAF50;
@@ -56,11 +67,20 @@ st.markdown("""
         margin: 1rem 0;
     }
     .stats-box {
-        background: white;
+        background: #1E1E1E;
         padding: 1.5rem;
         border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
         text-align: center;
+        border: 1px solid #333;
+    }
+    .stats-box h3 {
+        color: #4CAF50;
+        margin-bottom: 0.5rem;
+    }
+    .stats-box p {
+        color: #B0B0B0;
+        margin: 0;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -251,7 +271,7 @@ elif page == "📚 Learn More":
 # Footer
 st.markdown("---")
 st.markdown("""
-<div style="text-align: center; color: #666; font-size: 0.9rem;">
+<div style="text-align: center; color: #888; font-size: 0.9rem;">
     <p>LCS - Learn. Choose. Strategize. | Empowering beginners to invest with confidence</p>
     <p>⚠️ Disclaimer: This is for educational purposes only. Not financial advice.</p>
 </div>
