@@ -233,7 +233,7 @@ if current_question <= total_questions and not st.session_state.quiz_completed:
                 # Redirect to strategies page
                 st.success("Quiz completed! Generating your personalized strategies...")
                 st.balloons()
-                st.switch_page("pages/2_📊_Strategies.py")
+                st.switch_page("pages/2_Strategies.py")
 
 # Show quiz summary if completed
 if st.session_state.quiz_completed:
@@ -246,4 +246,4 @@ if st.session_state.quiz_completed:
             st.write(f"**{key.replace('_', ' ').title()}:** {value}")
     
     if st.button("View My Strategies →", type="primary", use_container_width=True):
-        st.switch_page("pages/2_📊_Strategies.py")
+        st.switch_page("pages/2_Strategies.py")
