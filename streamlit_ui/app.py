@@ -190,26 +190,26 @@ if page == "🏠 Home":
     with col2:
         st.markdown("### 🚀 Ready to Start Your Investment Journey?")
         if st.button("Start the Quiz 🎯", type="primary", use_container_width=True):
-            st.switch_page("pages/1_🎯_Onboarding.py")
+            st.switch_page("pages/1_Onboarding.py")
 
 elif page == "🎯 Start Quiz":
-    st.switch_page("pages/1_🎯_Onboarding.py")
+    st.switch_page("pages/1_Onboarding.py")
 
 elif page == "📊 View Strategies":
     if not st.session_state.quiz_completed:
         st.warning("Please complete the quiz first to see your personalized strategies!")
         if st.button("Go to Quiz"):
-            st.switch_page("pages/1_🎯_Onboarding.py")
+            st.switch_page("pages/1_Onboarding.py")
     else:
-        st.switch_page("pages/2_📊_Strategies.py")
+        st.switch_page("pages/2_Strategies.py")
 
 elif page == "🎲 Paper Trade":
     if not st.session_state.strategies:
         st.warning("Please complete the quiz and view your strategies first!")
         if st.button("Go to Quiz"):
-            st.switch_page("pages/1_🎯_Onboarding.py")
+            st.switch_page("pages/1_Onboarding.py")
     else:
-        st.switch_page("pages/3_🎲_Paper_Trade.py")
+        st.switch_page("pages/3_Paper_Trade.py")
 
 elif page == "📚 Learn More":
     st.markdown("## 📚 Investment Education Resources")
