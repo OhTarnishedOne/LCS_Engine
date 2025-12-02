@@ -11,6 +11,13 @@ from datetime import datetime
 import json
 import sys
 from pathlib import Path
+import os
+
+try:
+    from anthropic import Anthropic
+    ANTHROPIC_AVAILABLE = True
+except ImportError:
+    ANTHROPIC_AVAILABLE = False
 
 # Add parent directory to path
 sys.path.append(str(Path(__file__).parent.parent.parent))
@@ -206,7 +213,7 @@ st.markdown("# 📊 Your Personalized Investment Strategies")
 if not st.session_state.get('quiz_completed', False):
     st.warning("Please complete the onboarding quiz first!")
     if st.button("Go to Quiz"):
-        st.switch_page("pages/1_🎯_Onboarding.py")
+        st.switch_page("pages/1_Onboarding.py")
 else:
     # Generate strategies if not already done
     if not st.session_state.strategies:
@@ -277,7 +284,7 @@ else:
                 with col3:
                     if st.button(f"🎲 Test This Strategy", key=f"test_{idx}"):
                         st.session_state.selected_strategy = strategy
-                        st.switch_page("pages/3_🎲_Paper_Trade.py")
+                        st.switch_page("pages/3_Paper_Trade.py")
     
     with tab2:
         st.markdown("## 💬 AI Investment Assistant")
@@ -371,7 +378,68 @@ else:
             st.dataframe(df, use_container_width=True, hide_index=True)
 
 def generate_ai_response(question):
-    """Generate AI response (mock implementation - would use OpenAI in production)"""
+    """Generate AI response using Anthropic Claude API"""
+    
+    # Get API key from Streamlit secrets
+    api_key = st.secrets.get("ANTHROPIC_API_KEY", os.getenv("ANTHROPIC_API_KEY"))
+    
+    if not api_key or not ANTHROPIC_AVAILABLE:
+        # Fallback to mock responses if API not available
+        return generate_mock_response(question)
+    
+    try:
+        # Initialize Anthropic client
+        client = Anthropic(api_key=api_key)
+        
+        # Build context from user profile and selected strategy
+        profile = st.session_state.get('user_profile', {})
+        selected_strategy = st.session_state.get('selected_strategy')
+        
+        context = f"""You are an investment education assistant helping a user understand their personalized investment strategy.
+
+User Profile:
+- Investor Type: {profile.get('investor_type', 'Not specified')}
+- Experience Level: {profile.get('experience_level', 'Not specified')}
+- Investment Goals: {profile.get('goals', 'Not specified')}
+- Time Horizon: {profile.get('time_horizon', 'Not specified')}
+"""
+        
+        if selected_strategy:
+            context += f"""
+Currently Discussing Strategy: {selected_strategy['name']}
+- Description: {selected_strategy['description']}
+- Risk Level: {selected_strategy['risk_level']}
+- Expected Return: {selected_strategy['expected_return']}
+- Recommended Stocks: {', '.join([s['symbol'] for s in selected_strategy['stocks']])}
+"""
+        
+        context += """
+Guidelines:
+- Provide educational, easy-to-understand explanations
+- Reference the user's profile and selected strategy when relevant
+- Avoid giving specific buy/sell advice
+- Encourage learning and understanding over quick answers
+- Be conversational and supportive
+"""
+        
+        # Call Claude API
+        message = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=1024,
+            messages=[
+                {"role": "user", "content": f"{context}\n\nUser Question: {question}"}
+            ]
+        )
+        
+        # Extract response
+        return message.content[0].text
+        
+    except Exception as e:
+        st.error(f"AI Error: {str(e)}")
+        return generate_mock_response(question)
+
+def generate_mock_response(question):
+    """Fallback mock responses when API is unavailable"""
     
     # Mock responses based on common questions
     responses = {
@@ -382,14 +450,14 @@ def generate_ai_response(question):
         "crash": "Market crashes are temporary. Historical data shows that diversified portfolios recover over time. Your strategy is designed for your timeline, so short-term volatility shouldn't affect your long-term goals."
     }
     
-    # Simple keyword matching (would use OpenAI in production)
+    # Simple keyword matching
     question_lower = question.lower()
     for key, response in responses.items():
         if key in question_lower:
             return response
     
     # Default response
-    return "Great question! In a real implementation, I would use AI to provide a detailed, personalized answer based on your profile and selected strategy. For now, I recommend discussing this with a financial advisor or doing additional research on reputable investment education sites."
+    return "Great question! The AI assistant is currently in demo mode. In production, this would provide detailed, personalized answers based on your profile and selected strategy."
 
 def get_strategy_best_for(risk_level):
     """Get description of who strategy is best for"""
