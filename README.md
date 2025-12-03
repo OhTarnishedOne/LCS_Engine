@@ -114,7 +114,7 @@ LCS Engine emphasizes:
 ## 👤 Author
 
 **Rico** - Entrepreneur in Residence at LaunchNY, Columbia MBA '17
-- Background in fintech product management at Wells Fargo, Discovery, Comcast
+- Background in fintech adtech product management at Wells Fargo, Discovery, Comcast
 - Former VC at VU Venture Partners
 - Wall Street Quants certified
 
@@ -128,7 +128,6 @@ For beta access or partnership opportunities: [Your contact method]
 
 ## 🙏 Acknowledgments
 
-- Built with support from LaunchNY
 - Powered by Anthropic's Claude AI
 - Beta testing support from venture capital partners
 
