@@ -3,7 +3,7 @@ LCS - Learn. Choose. Strategize.
 Main Streamlit Application Entry Point
 """
 
-import streamlit as st
+import streamlit as st # type: ignore
 from pathlib import Path
 import sys
 
@@ -11,7 +11,7 @@ import sys
 sys.path.append(str(Path(__file__).parent.parent))
 
 # Import config
-from config import config, show_mode_indicator
+from config import config, show_mode_indicator # type: ignore
 
 # Page configuration
 st.set_page_config(
