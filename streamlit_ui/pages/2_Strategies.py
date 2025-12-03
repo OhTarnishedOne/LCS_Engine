@@ -74,6 +74,17 @@ if 'chat_messages' not in st.session_state:
 if 'selected_strategy' not in st.session_state:
     st.session_state.selected_strategy = None
 
+def get_strategy_best_for(risk_level):
+    """Get description of who strategy is best for"""
+    mapping = {
+        "Very Low": "Capital preservation, near retirement",
+        "Low": "Conservative investors, short-term goals",
+        "Moderate": "Balanced growth, medium-term goals",
+        "High": "Growth-focused, long-term investors",
+        "Very High": "Risk-tolerant, young investors"
+    }
+    return mapping.get(risk_level, "Varied investors")
+
 def generate_strategies():
     """Generate personalized strategies based on user profile"""
     
@@ -458,14 +469,3 @@ def generate_mock_response(question):
     
     # Default response
     return "Great question! The AI assistant is currently in demo mode. In production, this would provide detailed, personalized answers based on your profile and selected strategy."
-
-def get_strategy_best_for(risk_level):
-    """Get description of who strategy is best for"""
-    mapping = {
-        "Very Low": "Capital preservation, near retirement",
-        "Low": "Conservative investors, short-term goals",
-        "Moderate": "Balanced growth, medium-term goals",
-        "High": "Growth-focused, long-term investors",
-        "Very High": "Risk-tolerant, young investors"
-    }
-    return mapping.get(risk_level, "Varied investors")
