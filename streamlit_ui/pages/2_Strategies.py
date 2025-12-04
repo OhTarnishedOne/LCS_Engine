@@ -3,7 +3,7 @@ Strategy Display and AI Chat Page
 Shows personalized strategies and allows Q&A
 """
 
-import streamlit as st
+import streamlit as st # pyright: ignore[reportMissingImports]
 import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
