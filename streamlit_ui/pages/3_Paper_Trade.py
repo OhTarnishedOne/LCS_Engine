@@ -3,7 +3,7 @@ Paper Trading Simulation Page
 Allows users to test strategies with real market data
 """
 
-import streamlit as st
+import streamlit as st # type: ignore
 import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
@@ -14,6 +14,8 @@ import sys
 
 # Add parent directory to path
 sys.path.append(str(Path(__file__).parent.parent.parent))
+sys.path.append(str(Path(__file__).parent.parent))
+from session_utils import save_session, display_session_info
 
 st.set_page_config(
     page_title="LCS - Paper Trading",
@@ -241,6 +243,7 @@ else:
                 
                 st.success("✅ Trades executed successfully!")
                 st.balloons()
+                save_session()  # Save after executing trades
                 del st.session_state.pending_trades
                 del st.session_state.trade_remaining
                 st.rerun()

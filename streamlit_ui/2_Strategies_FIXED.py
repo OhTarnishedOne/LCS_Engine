@@ -3,7 +3,7 @@ Strategy Display and AI Chat Page
 Shows personalized strategies and allows Q&A
 """
 
-import streamlit as st # pyright: ignore[reportMissingImports]
+import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
@@ -12,8 +12,6 @@ import json
 import sys
 from pathlib import Path
 import os
-sys.path.append(str(Path(__file__).parent.parent))
-from session_utils import save_session, display_session_info
 
 try:
     from anthropic import Anthropic
@@ -75,110 +73,6 @@ if 'chat_messages' not in st.session_state:
     st.session_state.chat_messages = []
 if 'selected_strategy' not in st.session_state:
     st.session_state.selected_strategy = None
-
-# Helper functions - must be defined before main code
-def get_strategy_best_for(risk_level):
-    """Get description of who strategy is best for"""
-    mapping = {
-        "Very Low": "Capital preservation, near retirement",
-        "Low": "Conservative investors, short-term goals",
-        "Moderate": "Balanced growth, medium-term goals",
-        "High": "Growth-focused, long-term investors",
-        "Very High": "Risk-tolerant, young investors"
-    }
-    return mapping.get(risk_level, "Varied investors")
-
-def generate_mock_response(question):
-    """Fallback mock responses when API is unavailable"""
-    
-    # Mock responses based on common questions
-    responses = {
-        "risk": "Based on your quiz results, you indicated you'd hold or buy more during market downturns. This shows you can handle moderate volatility, which is why we've suggested strategies with balanced risk-reward profiles.",
-        "apple": "Apple is recommended because it's a financially strong company with consistent revenue growth, a loyal customer base, and strong cash generation. It fits well in a balanced portfolio.",
-        "dividend": "Growth stocks reinvest profits to expand the business, offering potential for price appreciation. Dividend stocks pay out profits to shareholders regularly, providing income. Your portfolio includes both for balance.",
-        "rebalance": "For beginners, reviewing your portfolio quarterly and rebalancing annually is typically sufficient. This helps maintain your target allocation without over-trading.",
-        "crash": "Market crashes are temporary. Historical data shows that diversified portfolios recover over time. Your strategy is designed for your timeline, so short-term volatility shouldn't affect your long-term goals."
-    }
-    
-    # Simple keyword matching
-    question_lower = question.lower()
-    for key, response in responses.items():
-        if key in question_lower:
-            return response
-    
-    # Default response
-    return "Great question! The AI assistant is currently in demo mode. In production, this would provide detailed, personalized answers based on your profile and selected strategy."
-
-def generate_ai_response(question):
-    """Generate AI response using Anthropic Claude API"""
-    
-    # Get API key from Streamlit secrets or environment
-    api_key = None
-    try:
-        # Try to get from Streamlit secrets first
-        api_key = st.secrets.get("ANTHROPIC_API_KEY")
-    except (FileNotFoundError, KeyError, AttributeError):
-        # secrets.toml doesn't exist or key not found
-        pass
-    
-    # Fall back to environment variable if secrets didn't work
-    if not api_key:
-        api_key = os.getenv("ANTHROPIC_API_KEY")
-    
-    if not api_key or not ANTHROPIC_AVAILABLE:
-        # Fallback to mock responses if API not available
-        return generate_mock_response(question)
-    
-    try:
-        # Initialize Anthropic client
-        client = Anthropic(api_key=api_key)
-        
-        # Build context from user profile and selected strategy
-        profile = st.session_state.get('user_profile', {})
-        selected_strategy = st.session_state.get('selected_strategy')
-        
-        context = f"""You are an investment education assistant helping a user understand their personalized investment strategy.
-
-User Profile:
-- Investor Type: {profile.get('investor_type', 'Not specified')}
-- Experience Level: {profile.get('experience_level', 'Not specified')}
-- Investment Goals: {profile.get('goals', 'Not specified')}
-- Time Horizon: {profile.get('time_horizon', 'Not specified')}
-"""
-        
-        if selected_strategy:
-            context += f"""
-Currently Discussing Strategy: {selected_strategy['name']}
-- Description: {selected_strategy['description']}
-- Risk Level: {selected_strategy['risk_level']}
-- Expected Return: {selected_strategy['expected_return']}
-- Recommended Stocks: {', '.join([s['symbol'] for s in selected_strategy['stocks']])}
-"""
-        
-        context += """
-Guidelines:
-- Provide educational, easy-to-understand explanations
-- Reference the user's profile and selected strategy when relevant
-- Avoid giving specific buy/sell advice
-- Encourage learning and understanding over quick answers
-- Be conversational and supportive
-"""
-        
-        # Call Claude API
-        message = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=1024,
-            messages=[
-                {"role": "user", "content": f"{context}\n\nUser Question: {question}"}
-            ]
-        )
-        
-        # Extract response
-        return message.content[0].text
-        
-    except Exception as e:
-        st.error(f"AI Error: {str(e)}")
-        return generate_mock_response(question)
 
 def generate_strategies():
     """Generate personalized strategies based on user profile"""
@@ -324,7 +218,6 @@ else:
     # Generate strategies if not already done
     if not st.session_state.strategies:
         st.session_state.strategies = generate_strategies()
-        save_session()  # Save after generating strategies
     
     # Display user profile summary
     profile = st.session_state.user_profile
@@ -422,11 +315,10 @@ else:
                 # Add user message
                 st.session_state.chat_messages.append({"role": "user", "content": user_input})
                 
-                # Generate AI response
+                # Generate AI response (mock for now - would integrate with OpenAI)
                 ai_response = generate_ai_response(user_input)
                 st.session_state.chat_messages.append({"role": "assistant", "content": ai_response})
                 
-                save_session()  # Save after chat interaction
                 st.rerun()
         
         # Sample questions
@@ -445,7 +337,6 @@ else:
                     st.session_state.chat_messages.append({"role": "user", "content": question})
                     ai_response = generate_ai_response(question)
                     st.session_state.chat_messages.append({"role": "assistant", "content": ai_response})
-                    save_session()
                     st.rerun()
     
     with tab3:
@@ -485,3 +376,106 @@ else:
             
             df = pd.DataFrame(comparison_data)
             st.dataframe(df, use_container_width=True, hide_index=True)
+
+def generate_ai_response(question):
+    """Generate AI response using Anthropic Claude API"""
+    
+    # Get API key from Streamlit secrets or environment
+    api_key = None
+    try:
+        # Try to get from Streamlit secrets first
+        api_key = st.secrets.get("ANTHROPIC_API_KEY")
+    except (FileNotFoundError, KeyError, AttributeError):
+        # secrets.toml doesn't exist or key not found
+        pass
+    
+    # Fall back to environment variable if secrets didn't work
+    if not api_key:
+        api_key = os.getenv("ANTHROPIC_API_KEY")
+    
+    if not api_key or not ANTHROPIC_AVAILABLE:
+        # Fallback to mock responses if API not available
+        return generate_mock_response(question)
+    
+    try:
+        # Initialize Anthropic client
+        client = Anthropic(api_key=api_key)
+        
+        # Build context from user profile and selected strategy
+        profile = st.session_state.get('user_profile', {})
+        selected_strategy = st.session_state.get('selected_strategy')
+        
+        context = f"""You are an investment education assistant helping a user understand their personalized investment strategy.
+
+User Profile:
+- Investor Type: {profile.get('investor_type', 'Not specified')}
+- Experience Level: {profile.get('experience_level', 'Not specified')}
+- Investment Goals: {profile.get('goals', 'Not specified')}
+- Time Horizon: {profile.get('time_horizon', 'Not specified')}
+"""
+        
+        if selected_strategy:
+            context += f"""
+Currently Discussing Strategy: {selected_strategy['name']}
+- Description: {selected_strategy['description']}
+- Risk Level: {selected_strategy['risk_level']}
+- Expected Return: {selected_strategy['expected_return']}
+- Recommended Stocks: {', '.join([s['symbol'] for s in selected_strategy['stocks']])}
+"""
+        
+        context += """
+Guidelines:
+- Provide educational, easy-to-understand explanations
+- Reference the user's profile and selected strategy when relevant
+- Avoid giving specific buy/sell advice
+- Encourage learning and understanding over quick answers
+- Be conversational and supportive
+"""
+        
+        # Call Claude API
+        message = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=1024,
+            messages=[
+                {"role": "user", "content": f"{context}\n\nUser Question: {question}"}
+            ]
+        )
+        
+        # Extract response
+        return message.content[0].text
+        
+    except Exception as e:
+        st.error(f"AI Error: {str(e)}")
+        return generate_mock_response(question)
+
+def generate_mock_response(question):
+    """Fallback mock responses when API is unavailable"""
+    
+    # Mock responses based on common questions
+    responses = {
+        "risk": "Based on your quiz results, you indicated you'd hold or buy more during market downturns. This shows you can handle moderate volatility, which is why we've suggested strategies with balanced risk-reward profiles.",
+        "apple": "Apple is recommended because it's a financially strong company with consistent revenue growth, a loyal customer base, and strong cash generation. It fits well in a balanced portfolio.",
+        "dividend": "Growth stocks reinvest profits to expand the business, offering potential for price appreciation. Dividend stocks pay out profits to shareholders regularly, providing income. Your portfolio includes both for balance.",
+        "rebalance": "For beginners, reviewing your portfolio quarterly and rebalancing annually is typically sufficient. This helps maintain your target allocation without over-trading.",
+        "crash": "Market crashes are temporary. Historical data shows that diversified portfolios recover over time. Your strategy is designed for your timeline, so short-term volatility shouldn't affect your long-term goals."
+    }
+    
+    # Simple keyword matching
+    question_lower = question.lower()
+    for key, response in responses.items():
+        if key in question_lower:
+            return response
+    
+    # Default response
+    return "Great question! The AI assistant is currently in demo mode. In production, this would provide detailed, personalized answers based on your profile and selected strategy."
+
+def get_strategy_best_for(risk_level):
+    """Get description of who strategy is best for"""
+    mapping = {
+        "Very Low": "Capital preservation, near retirement",
+        "Low": "Conservative investors, short-term goals",
+        "Moderate": "Balanced growth, medium-term goals",
+        "High": "Growth-focused, long-term investors",
+        "Very High": "Risk-tolerant, young investors"
+    }
+    return mapping.get(risk_level, "Varied investors")

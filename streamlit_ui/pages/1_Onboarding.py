@@ -7,6 +7,9 @@ import streamlit as st # pyright: ignore[reportMissingImports]
 import json
 from datetime import datetime
 from pathlib import Path
+import sys
+sys.path.append(str(Path(__file__).parent.parent))
+from session_utils import save_session, display_session_info
 
 st.set_page_config(
     page_title="LCS - Onboarding Quiz",
@@ -222,6 +225,9 @@ if current_question <= total_questions and not st.session_state.quiz_completed:
                 # Process results
                 st.session_state.user_profile = process_quiz_results(st.session_state.quiz_answers)
                 st.session_state.quiz_completed = True
+                
+                # Save session to database
+                save_session()
                 
                 # Save to session file (wrapped in try/except for cloud deployment)
                 try:
