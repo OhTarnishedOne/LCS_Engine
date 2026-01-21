@@ -89,7 +89,7 @@ with st.sidebar:
     # Navigation options
     page = st.radio(
         "Choose your journey:",
-        ["🏠 Home", "🎯 Start Quiz", "📊 View Strategies", "🎲 Paper Trade", "📚 Learn More"],
+        ["🏠 Home", "🎯 Start Quiz", "📊 View Strategies", "🎲 Paper Trade", "🧠 Probability Lab", "📚 Learn More"],
         index=0
     )
     
@@ -194,6 +194,9 @@ elif page == "🎲 Paper Trade":
             st.switch_page("pages/1_Onboarding.py")
     else:
         st.switch_page("pages/3_Paper_Trade.py")
+
+elif page == "🧠 Probability Lab":
+    st.switch_page("pages/4_Probability_Lab.py")
 
 elif page == "📚 Learn More":
     st.markdown("## 📚 Investment Education Resources")
