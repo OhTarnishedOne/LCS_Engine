@@ -3,7 +3,7 @@ Probability Lab Agent - Autonomous teacher for probabilistic thinking
 Uses Claude API for intelligent decision making and feedback generation
 """
 
-import streamlit as st
+import streamlit as st # type: ignore
 from typing import Dict, List, Optional, Tuple, Any
 from datetime import datetime, timedelta
 import random
@@ -16,10 +16,10 @@ import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 
-from tools.kalshi_client import get_kalshi_client
-from tools.metaculus_client import get_metaculus_client
-from tools.calibration import CalibrationAnalyzer, Prediction
-from config import config
+from tools.kalshi_client import get_kalshi_client # type: ignore
+from tools.metaculus_client import get_metaculus_client # type: ignore
+from tools.calibration import CalibrationAnalyzer, Prediction # type: ignore
+from config import config # type: ignore
 # AI streaming import removed - using direct API calls
 
 class ProbabilityAgent:
@@ -42,7 +42,7 @@ class ProbabilityAgent:
                     'overall_brier': None,
                     'rolling_brier': [],
                     'by_domain': {},
-                    'vs_market_baseline': None
+                    'vs_market_baseline': {}  # Empty dict, not None
                 },
                 'agent_state': {
                     'current_plan': 'Assess student level and present first prediction',
