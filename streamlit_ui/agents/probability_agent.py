@@ -56,6 +56,47 @@ class ProbabilityAgent:
                 }
             }
     
+    def _filter_sports_entertainment(self, markets: list) -> list:
+        """
+        Filter out sports and entertainment markets from Kalshi results
+        These aren't appropriate for financial literacy education
+        """
+        # Sports-related terms to filter out
+        sports_terms = [
+            # Players
+            'lamelo', 'luka', 'lebron', 'curry', 'durant', 'giannis', 'jokic',
+            'mahomes', 'kelce', 'travis', 'taylor swift', 'brady',
+            'banchero', 'randle', 'maxey', 'knueppel', 'vucevic',
+            # Leagues/Sports
+            'nba', 'nfl', 'mlb', 'nhl', 'mls', 'wnba', 'ncaa',
+            'football', 'basketball', 'baseball', 'hockey', 'soccer',
+            'touchdown', 'points', 'rebounds', 'assists', 'yards',
+            'super bowl', 'playoff', 'championship', 'mvp',
+            # Entertainment
+            'oscar', 'grammy', 'emmy', 'golden globe', 'box office',
+            'movie', 'album', 'billboard', 'streaming'
+        ]
+        
+        filtered = []
+        for market in markets:
+            title = market.get('title', '').lower()
+            ticker = market.get('ticker', '').lower()
+            category = market.get('category', '').lower()
+            
+            # Check if any sports/entertainment term appears
+            is_sports_entertainment = any(
+                term in title or term in ticker or term in category
+                for term in sports_terms
+            )
+            
+            # Also filter by ticker patterns (Kalshi sports tickers often have patterns)
+            has_sports_ticker = any(x in ticker for x in ['sport', 'nba', 'nfl', 'mlb'])
+            
+            if not is_sports_entertainment and not has_sports_ticker:
+                filtered.append(market)
+        
+        return filtered
+    
     def decide_next_action(self, state: Dict) -> Dict[str, Any]:
         """
         Use LLM to decide what the agent should do next
@@ -170,11 +211,15 @@ class ProbabilityAgent:
                 kalshi_categories.extend(kalshi_mapping.get(interest.lower(), [interest]))
 
             for category in kalshi_categories[:3]:
-                markets = self.kalshi_client.get_markets_by_category(category, limit=5)
+                markets = self.kalshi_client.get_markets_by_category(category, limit=10)
+                # Filter out sports/entertainment garbage
+                markets = self._filter_sports_entertainment(markets)
                 all_questions.extend(markets)
 
             if not all_questions:
-                all_questions = self.kalshi_client.fetch_markets(status="open", limit=20)
+                markets = self.kalshi_client.fetch_markets(status="open", limit=50)
+                # Filter out sports/entertainment garbage
+                all_questions = self._filter_sports_entertainment(markets)
 
         if not all_questions:
             return None
@@ -567,3 +612,4 @@ class ProbabilityAgent:
 
                 st.session_state.probability_lab['calibration']['vs_market_baseline'] = \
                     self.calibration_analyzer.compare_to_market(resolved)
+                    
