@@ -4,7 +4,7 @@ Handles API keys and demo mode settings
 """
 
 import os
-import streamlit as st
+import streamlit as st # type: ignore
 from typing import Optional, Dict
 
 class Config:

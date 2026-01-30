@@ -1,6 +1,7 @@
 """
 LCS - Learn. Choose. Strategize.
 Main Streamlit Application Entry Point
+WITH SUPABASE SESSION PERSISTENCE
 """
 
 import streamlit as st # type: ignore
@@ -13,8 +14,15 @@ sys.path.append(str(Path(__file__).parent.parent))
 # Import config
 from config import config, show_mode_indicator # type: ignore
 
-# Import session management
-from session_utils import init_session, display_session_info, save_session
+# Import NEW session management (Supabase-backed)
+from session_manager import ( # type: ignore
+    render_login_screen,
+    init_session,
+    save_session,
+    display_session_info,
+    logout,
+    get_session_manager
+)
 
 # Page configuration
 st.set_page_config(
@@ -48,6 +56,7 @@ st.markdown("""
         border-radius: 10px;
         margin: 1rem 0;
         border-left: 4px solid #4CAF50;
+        color: #333;
     }
     .cta-button {
         background: #4CAF50;
@@ -64,43 +73,101 @@ st.markdown("""
         border-radius: 8px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         text-align: center;
+        color: #333;
+    }
+    .stats-box h3 {
+        color: #2E7D32;
+    }
+    .stats-box p {
+        color: #666;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# Initialize session (handles both new and restored sessions)
+# ============================================
+# LOGIN GATE - Must log in to use the app
+# ============================================
+if not render_login_screen():
+    # Show some info while on login screen
+    st.markdown("---")
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.markdown("""
+        <div class="stats-box">
+            <h3>📚 Learn</h3>
+            <p>Get personalized investment education tailored to your experience level</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown("""
+        <div class="stats-box">
+            <h3>🎯 Choose</h3>
+            <p>Receive AI-powered strategy recommendations based on your goals</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col3:
+        st.markdown("""
+        <div class="stats-box">
+            <h3>📈 Strategize</h3>
+            <p>Test your strategies risk-free with real market data</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.stop()
+
+# ============================================
+# USER IS LOGGED IN - Continue with app
+# ============================================
+
+# Initialize/restore session from database
 session_restored = init_session()
 
 # Show mode indicator at the top of the page
 show_mode_indicator()
 
-# Display session info and shareable link
+# Display session info and save button
 display_session_info()
 
 # Show welcome back message if session was restored
-if session_restored and st.session_state.quiz_completed:
-    st.success(f"Welcome back! Your session has been restored. You're a {st.session_state.user_profile.get('investor_type', 'Unknown')} investor.")
+if session_restored and st.session_state.get('quiz_completed'):
+    investor_type = st.session_state.user_profile.get('investor_type', 'Unknown')
+    st.success(f"Welcome back! Your session has been restored. You're a {investor_type} investor.")
 
 # Sidebar navigation
 with st.sidebar:
     st.markdown("## 🧭 Navigation")
+    
+    # Show current user
+    sm = get_session_manager()
+    current_user = sm.get_current_user()
+    if current_user:
+        st.caption(f"Logged in as: **{current_user}**")
+    
     st.markdown("---")
     
     # Navigation options
     page = st.radio(
         "Choose your journey:",
-        ["🏠 Home", "🎯 Start Quiz", "📊 View Strategies", "🎲 Paper Trade", "🧠 Probability Lab", "📚 Learn More"],
+        ["🏠 Home", "🎯 Start Quiz", "📊 View Strategies", "🎲 Paper Trade", "📚 Learn More"],
         index=0
     )
     
-    # Show progress if quiz is started
-    if st.session_state.quiz_completed:
+    # Show progress if quiz is completed
+    if st.session_state.get('quiz_completed'):
         st.markdown("---")
         st.success("✅ Quiz Completed!")
         st.markdown("### Your Profile")
         if st.session_state.user_profile:
             for key, value in st.session_state.user_profile.items():
                 st.write(f"**{key}:** {value}")
+    
+    # Logout button at bottom
+    st.markdown("---")
+    if st.button("🚪 Log Out", use_container_width=True):
+        logout()
 
 # Main content based on navigation
 if page == "🏠 Home":
@@ -180,7 +247,7 @@ elif page == "🎯 Start Quiz":
     st.switch_page("pages/1_Onboarding.py")
 
 elif page == "📊 View Strategies":
-    if not st.session_state.quiz_completed:
+    if not st.session_state.get('quiz_completed'):
         st.warning("Please complete the quiz first to see your personalized strategies!")
         if st.button("Go to Quiz"):
             st.switch_page("pages/1_Onboarding.py")
@@ -188,15 +255,12 @@ elif page == "📊 View Strategies":
         st.switch_page("pages/2_Strategies.py")
 
 elif page == "🎲 Paper Trade":
-    if not st.session_state.strategies:
+    if not st.session_state.get('strategies'):
         st.warning("Please complete the quiz and view your strategies first!")
         if st.button("Go to Quiz"):
             st.switch_page("pages/1_Onboarding.py")
     else:
         st.switch_page("pages/3_Paper_Trade.py")
-
-elif page == "🧠 Probability Lab":
-    st.switch_page("pages/4_Probability_Lab.py")
 
 elif page == "📚 Learn More":
     st.markdown("## 📚 Investment Education Resources")

@@ -1,257 +1,350 @@
 """
-Session persistence manager for LCS Engine
-Handles saving and loading user sessions with SQLite
+LCS Engine - Session Manager (Supabase-backed)
+Replaces the file-based session manager with database persistence.
+
+This module provides the same interface as your original session_manager.py
+but stores data in Supabase instead of local files.
 """
 
-import sqlite3
-import json
+import streamlit as st # type: ignore
+from typing import Optional, Dict, Any
+from datetime import datetime
 import uuid
-from datetime import datetime, timedelta
-from pathlib import Path
-from typing import Dict, Optional, Any
 
-class DateTimeEncoder(json.JSONEncoder):
-    """Custom JSON encoder that handles datetime objects"""
-    def default(self, obj):
-        if isinstance(obj, datetime):
-            return obj.isoformat()
-        return super().default(obj)
+# Import our database module
+from database import LCSDatabase, auto_save_session # type: ignore
 
-def datetime_decoder(dct):
-    """Decode ISO format strings back to datetime objects"""
-    for key, value in dct.items():
-        if isinstance(value, str):
-            # Try to parse ISO format datetime strings
-            try:
-                # Check if it looks like an ISO datetime string
-                if 'T' in value and len(value) > 15:
-                    dct[key] = datetime.fromisoformat(value)
-            except (ValueError, AttributeError):
-                pass
-    return dct
-
-try:
-    import streamlit as st
-except ImportError:
-    # For testing purposes when streamlit is not available
-    class MockST:
-        class session_state:
-            pass
-        @staticmethod
-        def get_option(key):
-            return "localhost" if key == "browser.serverAddress" else "8501"
-    st = MockST()
 
 class SessionManager:
-    def __init__(self, db_path: str = "lcs_sessions.db"):
-        """Initialize the session manager with SQLite database"""
-        self.db_path = Path(db_path)
-        self.init_database()
+    """
+    Manages user sessions with Supabase persistence.
     
-    def init_database(self):
-        """Create the sessions table if it doesn't exist"""
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS sessions (
-                    session_id TEXT PRIMARY KEY,
-                    user_profile TEXT,
-                    quiz_answers TEXT,
-                    quiz_completed BOOLEAN,
-                    quiz_step INTEGER,
-                    strategies TEXT,
-                    selected_strategy TEXT,
-                    chat_messages TEXT,
-                    portfolio TEXT,
-                    trade_history TEXT,
-                    initial_investment REAL,
-                    created_at TIMESTAMP,
-                    updated_at TIMESTAMP,
-                    last_accessed TIMESTAMP
-                )
-            """)
-            conn.commit()
+    Key changes from file-based version:
+    - Sessions are stored in Supabase, not local files
+    - Users identified by username, not random session ID
+    - Sessions persist across deploys and devices
+    """
+    
+    def __init__(self):
+        self.db = LCSDatabase()
+        self._current_username: Optional[str] = None
+    
+    @property
+    def is_connected(self) -> bool:
+        """Check if database is available"""
+        return self.db.is_connected()
     
     def generate_session_id(self) -> str:
-        """Generate a unique session ID"""
-        return str(uuid.uuid4())[:8]  # Short ID for easier sharing
+        """
+        Generate a unique session ID.
+        Note: With Supabase, we use usernames instead of random IDs,
+        but keeping this for backwards compatibility.
+        """
+        return str(uuid.uuid4())[:8]
     
-    def save_session(self, session_id: Optional[str] = None) -> str:
-        """Save current Streamlit session state to database"""
-        if not session_id:
-            session_id = st.session_state.get('session_id')
-            if not session_id:
-                session_id = self.generate_session_id()
-                st.session_state.session_id = session_id
+    def set_current_user(self, username: str):
+        """Set the current logged-in user"""
+        self._current_username = username.lower().strip()
+        st.session_state.logged_in_user = self._current_username
+    
+    def get_current_user(self) -> Optional[str]:
+        """Get the current logged-in user"""
+        return st.session_state.get("logged_in_user") or self._current_username
+    
+    def load_session(self, username: str) -> bool:
+        """
+        Load a session by username.
         
-        # Prepare session data
-        session_data = {
-            'user_profile': json.dumps(st.session_state.get('user_profile', {}), cls=DateTimeEncoder),
-            'quiz_answers': json.dumps(st.session_state.get('quiz_answers', {}), cls=DateTimeEncoder),
-            'quiz_completed': st.session_state.get('quiz_completed', False),
-            'quiz_step': st.session_state.get('quiz_step', 1),
-            'strategies': json.dumps(st.session_state.get('strategies', []), cls=DateTimeEncoder),
-            'selected_strategy': json.dumps(st.session_state.get('selected_strategy', None), cls=DateTimeEncoder),
-            'chat_messages': json.dumps(st.session_state.get('chat_messages', []), cls=DateTimeEncoder),
-            'portfolio': json.dumps(st.session_state.get('portfolio', {}), cls=DateTimeEncoder),
-            'trade_history': json.dumps(st.session_state.get('trade_history', []), cls=DateTimeEncoder),
-            'initial_investment': st.session_state.get('initial_investment', 10000),
+        Args:
+            username: The user's identifier
+            
+        Returns:
+            True if session was loaded successfully
+        """
+        session = self.db.get_session(username)
+        
+        if session:
+            self.db.restore_session_to_streamlit(session["session_data"])
+            self.set_current_user(username)
+            return True
+        
+        return False
+    
+    def save_session(self, username: Optional[str] = None) -> bool:
+        """
+        Save the current session to database.
+        
+        Args:
+            username: Optional username override (uses current user if not provided)
+            
+        Returns:
+            True if saved successfully
+        """
+        user = username or self.get_current_user()
+        
+        if not user:
+            return False
+        
+        session_data = self.db.extract_session_data_from_streamlit()
+        return self.db.save_session(user, session_data)
+    
+    def create_new_session(self, username: str) -> bool:
+        """
+        Create a new session for a user.
+        
+        Args:
+            username: The user's identifier
+            
+        Returns:
+            True if created successfully
+        """
+        if self.db.create_session(username):
+            self.set_current_user(username)
+            self._initialize_session_state()
+            return True
+        return False
+    
+    def session_exists(self, username: str) -> bool:
+        """Check if a session exists for a username"""
+        return self.db.session_exists(username)
+    
+    def get_session_url(self, username: Optional[str] = None) -> str:
+        """
+        Get a shareable URL for the session.
+        
+        Note: With database persistence, users just need their username,
+        not a special URL. But keeping this for UI compatibility.
+        """
+        # Save before generating URL
+        self.save_session(username)
+        
+        user = username or self.get_current_user()
+        if user:
+            return f"Just remember your username: {user}"
+        
+        return "Please log in to save your progress."
+    
+    def _initialize_session_state(self):
+        """Initialize default session state values"""
+        defaults = {
+            "user_profile": {},
+            "quiz_completed": False,
+            "quiz_step": 1,
+            "quiz_answers": {},
+            "strategies": [],
+            "selected_strategy": None,
+            "chat_messages": [],
+            "portfolio": {},
+            "trade_history": [],
+            "initial_investment": 10000
         }
         
-        now = datetime.now().isoformat()
-        
-        with sqlite3.connect(self.db_path) as conn:
-            # Check if session exists
-            existing = conn.execute(
-                "SELECT session_id FROM sessions WHERE session_id = ?",
-                (session_id,)
-            ).fetchone()
-            
-            if existing:
-                # Update existing session
-                conn.execute("""
-                    UPDATE sessions SET
-                        user_profile = ?,
-                        quiz_answers = ?,
-                        quiz_completed = ?,
-                        quiz_step = ?,
-                        strategies = ?,
-                        selected_strategy = ?,
-                        chat_messages = ?,
-                        portfolio = ?,
-                        trade_history = ?,
-                        initial_investment = ?,
-                        updated_at = ?,
-                        last_accessed = ?
-                    WHERE session_id = ?
-                """, (
-                    session_data['user_profile'],
-                    session_data['quiz_answers'],
-                    session_data['quiz_completed'],
-                    session_data['quiz_step'],
-                    session_data['strategies'],
-                    session_data['selected_strategy'],
-                    session_data['chat_messages'],
-                    session_data['portfolio'],
-                    session_data['trade_history'],
-                    session_data['initial_investment'],
-                    now,
-                    now,
-                    session_id
-                ))
-            else:
-                # Create new session
-                conn.execute("""
-                    INSERT INTO sessions (
-                        session_id, user_profile, quiz_answers, quiz_completed,
-                        quiz_step, strategies, selected_strategy, chat_messages,
-                        portfolio, trade_history, initial_investment,
-                        created_at, updated_at, last_accessed
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    session_id,
-                    session_data['user_profile'],
-                    session_data['quiz_answers'],
-                    session_data['quiz_completed'],
-                    session_data['quiz_step'],
-                    session_data['strategies'],
-                    session_data['selected_strategy'],
-                    session_data['chat_messages'],
-                    session_data['portfolio'],
-                    session_data['trade_history'],
-                    session_data['initial_investment'],
-                    now,
-                    now,
-                    now
-                ))
-            
-            conn.commit()
-        
-        return session_id
+        for key, value in defaults.items():
+            if key not in st.session_state:
+                st.session_state[key] = value
+
+
+# =========================================================================
+# UPDATED SESSION UTILS (drop-in replacement for your session_utils.py)
+# =========================================================================
+
+# Global session manager instance
+_session_manager: Optional[SessionManager] = None
+
+def get_session_manager() -> SessionManager:
+    """Get or create the session manager singleton"""
+    global _session_manager
+    if _session_manager is None:
+        _session_manager = SessionManager()
+    return _session_manager
+
+
+def init_session() -> bool:
+    """
+    Initialize or restore session.
     
-    def load_session(self, session_id: str) -> bool:
-        """Load session from database into Streamlit session state"""
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            row = conn.execute(
-                "SELECT * FROM sessions WHERE session_id = ?",
-                (session_id,)
-            ).fetchone()
-            
-            if not row:
-                return False
-            
-            # Update last accessed time
-            conn.execute(
-                "UPDATE sessions SET last_accessed = ? WHERE session_id = ?",
-                (datetime.now().isoformat(), session_id)
-            )
-            conn.commit()
-            
-            # Restore session state
-            st.session_state.session_id = session_id
-            st.session_state.user_profile = json.loads(row['user_profile'] or '{}', object_hook=datetime_decoder)
-            st.session_state.quiz_answers = json.loads(row['quiz_answers'] or '{}', object_hook=datetime_decoder)
-            st.session_state.quiz_completed = bool(row['quiz_completed'])
-            st.session_state.quiz_step = row['quiz_step'] or 1
-            st.session_state.strategies = json.loads(row['strategies'] or '[]', object_hook=datetime_decoder)
-            st.session_state.selected_strategy = json.loads(row['selected_strategy'] or 'null', object_hook=datetime_decoder)
-            st.session_state.chat_messages = json.loads(row['chat_messages'] or '[]', object_hook=datetime_decoder)
-            st.session_state.portfolio = json.loads(row['portfolio'] or '{}', object_hook=datetime_decoder)
-            st.session_state.trade_history = json.loads(row['trade_history'] or '[]', object_hook=datetime_decoder)
-            st.session_state.initial_investment = row['initial_investment'] or 10000
-            
+    New flow:
+    1. Check if user is already logged in (session_state)
+    2. If not, show login UI
+    3. If yes, ensure session state is populated
+    
+    Returns:
+        True if session was restored from database
+    """
+    sm = get_session_manager()
+    
+    # Already logged in?
+    current_user = sm.get_current_user()
+    
+    if current_user:
+        # Make sure session state is initialized
+        if "quiz_completed" not in st.session_state:
+            sm.load_session(current_user)
+            return True
+        return False
+    
+    # Check URL params for legacy support
+    query_params = st.query_params
+    session_param = query_params.get("session") or query_params.get("user")
+    
+    if session_param:
+        if sm.load_session(session_param):
+            st.query_params.clear()  # Clean URL
             return True
     
-    def get_session_url(self, session_id: Optional[str] = None) -> str:
-        """Generate a shareable URL for the session"""
-        if not session_id:
-            session_id = getattr(st.session_state, 'session_id', '') if hasattr(st, 'session_state') else ''
-        
-        # Get the current URL from Streamlit
-        # In production, this would be your deployed URL
-        base_url = "https://lcs-engine.streamlit.app"
-        
-        # For local development, use localhost
-        try:
-            if hasattr(st, 'get_option') and "localhost" in st.get_option("browser.serverAddress"):
-                base_url = f"http://localhost:{st.get_option('browser.serverPort')}"
-        except:
-            # Default to production URL if can't determine
-            pass
-        
-        return f"{base_url}/?session={session_id}"
+    return False
+
+
+def save_session():
+    """Save current session to database"""
+    sm = get_session_manager()
+    sm.save_session()
+
+
+def get_shareable_link() -> str:
+    """Get shareable link (now just returns username reminder)"""
+    sm = get_session_manager()
+    return sm.get_session_url()
+
+
+def display_session_info():
+    """Display session information in the UI"""
+    sm = get_session_manager()
+    current_user = sm.get_current_user()
     
-    def cleanup_old_sessions(self, days: int = 30):
-        """Remove sessions older than specified days"""
-        cutoff_date = (datetime.now() - timedelta(days=days)).isoformat()
-        
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute(
-                "DELETE FROM sessions WHERE last_accessed < ?",
-                (cutoff_date,)
-            )
-            conn.commit()
+    if not current_user:
+        return
     
-    def get_session_info(self, session_id: str) -> Optional[Dict[str, Any]]:
-        """Get information about a session"""
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            row = conn.execute("""
-                SELECT session_id, created_at, updated_at, last_accessed,
-                       quiz_completed, user_profile
-                FROM sessions WHERE session_id = ?
-            """, (session_id,)).fetchone()
-            
-            if not row:
-                return None
-            
-            user_profile = json.loads(row['user_profile'] or '{}')
-            
-            return {
-                'session_id': row['session_id'],
-                'created_at': row['created_at'],
-                'updated_at': row['updated_at'],
-                'last_accessed': row['last_accessed'],
-                'quiz_completed': bool(row['quiz_completed']),
-                'investor_type': user_profile.get('investor_type', 'Unknown')
-            }
+    with st.expander("📌 Your Session", expanded=False):
+        col1, col2 = st.columns([3, 1])
+        
+        with col1:
+            st.info(f"**Logged in as:** {current_user}")
+            st.caption("Your progress is automatically saved. Just remember your username to return!")
+        
+        with col2:
+            if st.button("💾 Save Now", key="manual_save_btn"):
+                if sm.save_session():
+                    st.success("Saved!")
+                else:
+                    st.error("Save failed")
+        
+        # Connection status
+        if sm.is_connected:
+            st.caption("✅ Connected to database")
+        else:
+            st.caption("⚠️ Demo mode - progress won't persist")
+
+
+def render_login_screen() -> bool:
+    """
+    Render login screen and handle authentication.
+    
+    Returns:
+        True if user is logged in, False if login screen is showing
+        
+    Usage in app.py:
+        from session_manager import render_login_screen, init_session
+        
+        # At the start of your app:
+        if not render_login_screen():
+            st.stop()  # Don't render rest of app until logged in
+        
+        # User is now logged in, continue with app...
+    """
+    sm = get_session_manager()
+    
+    # Already logged in?
+    if sm.get_current_user():
+        return True
+    
+    # Show login UI
+    st.markdown("## 👋 Welcome to LCS Engine")
+    st.markdown("**Learn. Choose. Strategize.**")
+    st.markdown("---")
+    
+    st.markdown("Enter your name to get started. If you've used LCS before, enter the same name to restore your progress.")
+    
+    # Login form
+    with st.form("login_form"):
+        username = st.text_input(
+            "Your Name",
+            placeholder="e.g., maria_2025",
+            help="Use something memorable! This is how you'll log back in."
+        )
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            submit = st.form_submit_button("Continue →", type="primary", use_container_width=True)
+    
+    if submit and username:
+        clean_username = username.lower().strip().replace(" ", "_")
+        
+        # Validate
+        if len(clean_username) < 3:
+            st.error("Please enter at least 3 characters.")
+            return False
+        
+        if not clean_username.replace("_", "").isalnum():
+            st.error("Please use only letters, numbers, and underscores.")
+            return False
+        
+        # Check if returning user
+        if sm.session_exists(clean_username):
+            if sm.load_session(clean_username):
+                st.success(f"Welcome back, {clean_username}! 🎉")
+                st.balloons()
+                st.rerun()
+        else:
+            # New user
+            if sm.create_new_session(clean_username):
+                st.success(f"Welcome, {clean_username}! Let's get started. 🚀")
+                st.rerun()
+            else:
+                st.error("Could not create session. Please try again.")
+        
+        return False
+    
+    # Show demo mode warning if not connected
+    if not sm.is_connected:
+        st.warning("""
+        ⚠️ **Demo Mode**: Database not connected. 
+        Your progress won't be saved between sessions.
+        """)
+    
+    return False
+
+
+def logout():
+    """Log out the current user"""
+    sm = get_session_manager()
+    
+    # Save before logging out
+    sm.save_session()
+    
+    # Clear session state
+    for key in list(st.session_state.keys()):
+        del st.session_state[key]
+    
+    st.rerun()
+
+
+# =========================================================================
+# AUTO-SAVE DECORATOR
+# =========================================================================
+
+def auto_save_on_change(func):
+    """
+    Decorator to automatically save session after a function runs.
+    
+    Usage:
+        @auto_save_on_change
+        def complete_quiz():
+            st.session_state.quiz_completed = True
+            # ... process quiz results
+    """
+    def wrapper(*args, **kwargs):
+        result = func(*args, **kwargs)
+        save_session()
+        return result
+    return wrapper
