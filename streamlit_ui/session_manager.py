@@ -273,6 +273,12 @@ def render_login_screen() -> bool:
             help="Use something memorable! This is how you'll log back in."
         )
         
+        start_fresh = st.checkbox(
+            "Start fresh (clear previous progress)",
+            value=False,
+            help="Check this to start over, even if you've used this name before."
+        )
+        
         col1, col2 = st.columns(2)
         with col1:
             submit = st.form_submit_button("Continue →", type="primary", use_container_width=True)
@@ -291,10 +297,18 @@ def render_login_screen() -> bool:
         
         # Check if returning user
         if sm.session_exists(clean_username):
-            if sm.load_session(clean_username):
-                st.success(f"Welcome back, {clean_username}! 🎉")
-                st.balloons()
+            if start_fresh:
+                # User wants to start over - create fresh session
+                sm._initialize_session_state()
+                sm.set_current_user(clean_username)
+                sm.save_session()  # Overwrite old data with fresh state
+                st.success(f"Fresh start, {clean_username}! Let's go. 🚀")
                 st.rerun()
+            else:
+                if sm.load_session(clean_username):
+                    st.success(f"Welcome back, {clean_username}! 🎉")
+                    st.balloons()
+                    st.rerun()
         else:
             # New user
             if sm.create_new_session(clean_username):
