@@ -336,6 +336,9 @@ def logout():
     # Save before logging out
     sm.save_session()
     
+    # Clear the singleton's cached username
+    sm._current_username = None
+    
     # Clear session state
     for key in list(st.session_state.keys()):
         del st.session_state[key]
